@@ -1,0 +1,39 @@
+name: build
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+
+jobs:
+  build:
+    name: "${{ matrix.build.name }}"
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        build:
+          - name: Build GCC
+            compiler: g++
+
+          - name: Build Clang
+            compiler: clang++
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install \
+            build-essential cmake clang \
+            liblightdm-qt5-3-dev qtbase5-dev qtwebengine5-dev
+
+      - name: Build
+        env:
+          CXX: "${{ matrix.build.compiler }}"
+        run: |
+          mkdir build && cd build
+          cmake ..
+          make DESTDIR=/tmp/$CXX/ install
