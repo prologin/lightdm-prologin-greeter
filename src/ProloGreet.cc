@@ -26,16 +26,14 @@
 namespace {
 
 void SetWebviewOptions(QWebEngineView* view) {
+  view->setContextMenuPolicy(Qt::NoContextMenu);
   using S = QWebEngineSettings;
   auto settings = view->settings();
-  settings->setAttribute(S::LocalContentCanAccessRemoteUrls, false);
   settings->setAttribute(S::FocusOnNavigationEnabled, true);
   settings->setAttribute(S::FullScreenSupportEnabled, true);
-  settings->setAttribute(S::LocalContentCanAccessFileUrls, true);
-  settings->setAttribute(S::ScrollAnimatorEnabled, true);
   settings->setAttribute(S::JavascriptEnabled, true);
-  settings->setAttribute(S::JavascriptCanPaste, true);
-  view->setContextMenuPolicy(Qt::NoContextMenu);
+  settings->setAttribute(S::LocalContentCanAccessFileUrls, true);
+  settings->setAttribute(S::LocalContentCanAccessRemoteUrls, false);
 }
 
 }  // namespace
