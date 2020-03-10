@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(lightdm_prologin_greeter)
+project(lightdm-prologin-greeter)
 
 include(GNUInstallDirs REQUIRED)
 

@@ -36,4 +36,4 @@ jobs:
         run: |
           mkdir build && cd build
           cmake ..
-          make DESTDIR=/tmp/$CXX/ install
+          make DESTDIR=/tmp install
