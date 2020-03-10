@@ -1,0 +1,176 @@
+html, body {
+  margin: 0;
+  padding: 0;
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  background-color: #333;
+  color: #efefef;
+  font-family: 'Roboto Mono', 'Consolata', monospace, sans-serif;
+  font-size: 0.9rem;
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-template-rows: auto 1fr auto auto;
+  grid-row-gap: 1rem;
+  grid-template-areas: "head" "form" "power" "foot";
+  align-items: center;
+  text-align: center;
+  justify-content: center;
+}
+
+h1 {
+  margin: 4rem 0 0;
+  padding: 0;
+}
+
+h1 > span {
+  color: mediumaquamarine;
+}
+
+#head {
+  grid-area: head;
+}
+
+#form {
+  grid-area: form;
+  display: grid;
+  width: 420px;
+  justify-self: center;
+  grid-template-columns: 1fr;
+  grid-row-gap: 1rem;
+}
+
+#sessions {
+  display: grid;
+  grid-gap: .5rem;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+}
+
+#power {
+  grid-area: power;
+  display: grid;
+  padding: 2rem 0;
+  width: 420px;
+  justify-self: center;
+  grid-template-columns: 1fr 1fr;
+  grid-column-gap: 1rem;
+}
+
+#foot {
+  grid-area: foot;
+  text-align: center;
+  padding-top: 2rem;
+}
+
+input, button, #sessions label > span {
+  font: inherit;
+  border-radius: 3px;
+  background-color: #00000033;
+  border: 1px solid #00000077;
+  padding: .5rem 1rem;
+  height: 2.5rem;
+  line-height: 1.6; /* I have no idea. */
+  width: 100%;
+  color: inherit;
+  opacity: 1;
+  transition: all ease-in .2s;
+  outline: none;
+}
+
+button:not(:disabled), #sessions input[type=radio]:not(:disabled) + span {
+  cursor: pointer;
+}
+
+#sessions label span {
+  display: block;
+  white-space: nowrap;
+  font-size: .8rem;
+}
+
+#sessions input[type=radio] {
+  /* Random hacks to hide radio without losing keyboard access. */
+  float: left;
+  width: 0;
+  height: 0;
+  opacity: 0;
+}
+
+input::placeholder {
+  font: inherit;
+  color: #aaa;
+}
+
+input[type=password]::placeholder {
+  letter-spacing: normal;
+}
+
+input[type=password] {
+  letter-spacing: 2pt;
+}
+
+button::-moz-focus-inner {
+  border: none;
+}
+
+input:focus:not(:disabled), button:focus:not(:disabled), #sessions input[type=radio]:checked + span {
+  border-color: mediumaquamarine;
+}
+
+input:disabled, button:disabled, #sessions input[type=radio]:disabled + span {
+  opacity: 0;
+}
+
+#input-username:disabled {
+  opacity: 1;
+  background: transparent;
+  border-color: #efefef;
+}
+
+.error {
+  color: #e67373;
+}
+
+#status {
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity ease .2s;
+  content: "";
+}
+
+#status.visible {
+  opacity: 1;
+  visibility: visible;
+}
+
+.invalid {
+  animation: shake 0.75s cubic-bezier(.36, .07, .19, .97) both;
+  transform: translate3d(0, 0, 0);
+  backface-visibility: hidden;
+  perspective: 1000px;
+}
+
+@keyframes shake {
+  10%, 90% {
+    transform: translate3d(-1px, 0, 0);
+  }
+  20%, 80% {
+    transform: translate3d(2px, 0, 0);
+  }
+  30%, 50%, 70% {
+    transform: translate3d(-4px, 0, 0);
+  }
+  40%, 60% {
+    transform: translate3d(4px, 0, 0);
+  }
+}

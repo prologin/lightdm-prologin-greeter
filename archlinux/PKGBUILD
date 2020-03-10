@@ -1,0 +1,28 @@
+pkgname=lightdm-prologin-greeter
+pkgver=1.0
+pkgrel=1
+epoch=1
+pkgdesc='ProLogin greeter for LightDM'
+arch=(x86_64)
+url=https://github.com/prologin/sadm
+license=(MIT)
+depends=(
+  liblightdm-qt5
+  lightdm
+  qt5-base
+  qt5-webchannel
+  qt5-webengine
+  qt5-webview
+)
+backup=(etc/lightdm/lightdm-prologin-greeter.conf)
+
+build() {
+  cmake -DCMAKE_INSTALL_PREFIX=/ -DCMAKE_BUILD_TYPE=Release -B build ../../
+  cd build && make
+}
+
+package() {
+  cd build && make DESTDIR="$pkgdir" install
+}
+
+# vim: ts=2 sw=2 et:

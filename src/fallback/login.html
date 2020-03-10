@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<section id="head">
+  <h1>Prologin <span>Greeter</span></h1>
+</section>
+
+<form id="form">
+  <p id="text-status">&nbsp;</p>
+  <input id="input-username" type="text" placeholder="Username">
+  <input id="input-password" type="password" placeholder="Password">
+  <section id="sessions"></section>
+  <button id="btn-login" type="submit">Log in</button>
+</form>
+
+<section id="power">
+  <button class="power" id="btn-poweroff">Power off</button>
+  <button class="power" id="btn-reboot">Reboot</button>
+</section>
+
+<section id="foot">
+  <p>This is the internal fallback interface for lightdm-prologin-greeter.</p>
+</section>
+
+<script src="qrc:///qtwebchannel/qwebchannel.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

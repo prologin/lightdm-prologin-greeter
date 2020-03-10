@@ -1,0 +1,8 @@
+<!DOCTYPE RCC>
+<RCC>
+    <qresource prefix="">
+        <file>fallback/login.html</file>
+        <file>fallback/app.js</file>
+        <file>fallback/style.css</file>
+    </qresource>
+</RCC>

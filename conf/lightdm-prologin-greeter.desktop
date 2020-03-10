@@ -1,0 +1,4 @@
+[Desktop Entry]
+Name=ProLogin Greeter
+Exec=lightdm-prologin-greeter
+Type=Application
