@@ -3,7 +3,6 @@ function invalidShake($el) {
   setTimeout(() => $el.classList.remove("invalid"), 750);
 }
 
-let prologin;
 (function () {
   const $form = document.getElementById('form');
   const $status = document.getElementById('text-status');
@@ -21,6 +20,8 @@ let prologin;
   const $indicators = [$capslock, $numlock];
 
   $username.focus();
+
+  let prologin;
   let statusTimeout;
 
   $poweroff.onclick = (e) => {
@@ -65,14 +66,14 @@ let prologin;
   function createSessionRadios(sessions) {
     createRadios('sessions', $sessions, sessions,
       s => s.id, s => s.name,
-      s => `Log-in using window manager: ${s.description}`);
+      s => `Log-in using ${s.name} desktop environment`);
   }
 
   function createLayoutRadios(layouts) {
     createRadios('layouts', $layouts, layouts,
       (s, i) => i,
       s => s.long,
-      s => `Keyboard layout: ${s.short}`,
+      s => `Switch to ${s.long} keyboard layout`,
       async function () {
         const id = this.value;
         await prologin.SetKeyboardLayout(id);

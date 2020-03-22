@@ -141,7 +141,7 @@ class ProloJs : public QObject {
   // Signal sent to JS when active keyboard layout changes.
   void OnKeyboardLayoutChange(int id);
   // Signal sent to JS when available keyboard layouts change. Retrieve layouts
-  // with keyboardLayouts().
+  // with KeyboardLayouts().
   void OnKeyboardLayoutsChange();
 
  public slots:

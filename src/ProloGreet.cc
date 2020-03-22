@@ -10,7 +10,6 @@
 #include <QWebEngineSettings>
 #include <QWebEngineView>
 #include <QtConcurrent/QtConcurrent>
-#include <iostream>
 
 // Protocol:
 // greeter                       lightdm                      prologind
