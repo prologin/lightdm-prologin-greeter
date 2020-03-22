@@ -28,7 +28,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install \
             build-essential cmake clang \
-            liblightdm-qt5-3-dev qtbase5-dev qtwebengine5-dev
+            liblightdm-qt5-3-dev qtbase5-dev qtwebengine5-dev libxcb-xkb-dev
 
       - name: Build
         env:

@@ -10,6 +10,7 @@
 #include <QWebEngineSettings>
 #include <QWebEngineView>
 #include <QtConcurrent/QtConcurrent>
+#include <iostream>
 
 // Protocol:
 // greeter                       lightdm                      prologind
@@ -91,6 +92,17 @@ ProloGreet::ProloGreet(Options options, QWidget* parent)
           &ProloGreet::OnLightDMPrompt);
   connect(lightdm_, &QLightDM::Greeter::authenticationComplete, this,
           &ProloGreet::OnLightDMAuthenticationComplete);
+
+  keyboard_ = new KeyboardModel(this);
+  connect(keyboard_, &KeyboardModel::currentLayoutChanged,
+          [this](int id) { prolojs_->OnKeyboardLayoutChange(id); });
+  connect(keyboard_, &KeyboardModel::layoutsChanged,
+          [this]() { prolojs_->OnKeyboardLayoutsChange(); });
+  connect(keyboard_, &KeyboardModel::capsLockStateChanged,
+          [this](bool enabled) { prolojs_->OnCapsLockChange(enabled); });
+  connect(keyboard_, &KeyboardModel::numLockStateChanged,
+          [this](bool enabled) { prolojs_->OnNumLockChange(enabled); });
+  keyboard_->initialize();
 }
 
 bool ProloGreet::Start() {
@@ -293,11 +305,37 @@ QList<XSession> ProloGreet::AvailableSessions() const {
   }
   return sessions;
 }
+
 void ProloGreet::OnPrologindSocketError(QLocalSocket::LocalSocketError) {}
 
 void ProloGreet::OnPrologindSocketDisconnected() {}
 
 ProloJs::ProloJs(ProloGreet* prolo) : QObject(), prolo_(prolo) {}
+
+QVariant ProloJs::AvailableSessions() {
+  QVariantList list;
+  for (const auto& s : prolo_->AvailableSessions()) {
+    QVariantMap map;
+    map.insert("id", s.id);
+    map.insert("name", s.name);
+    map.insert("description", s.description);
+    list.append(map);
+  }
+  return QVariant::fromValue(list);
+}
+
+QVariant ProloJs::KeyboardLayouts() {
+  QVariantList list;
+  for (const auto* layout : prolo_->keyboard_->layouts()) {
+    QVariantMap map;
+    map.insert("short", layout->shortName());
+    map.insert("long", layout->longName());
+    list.append(map);
+  }
+  return QVariant::fromValue(list);
+}
+
+void ProloJs::SetKeyboardLayout(int id) { prolo_->keyboard_->setLayout(id); }
 
 void ProloJs::Authenticate(const QString& username, const QString& password,
                            const QString& session) {
@@ -311,15 +349,3 @@ void ProloJs::SetLanguage(const QString& language) {
 void ProloJs::PowerOff() { prolo_->PowerOff(); }
 
 void ProloJs::Reboot() { prolo_->Reboot(); }
-
-QVariant ProloJs::AvailableSessions() {
-  QVariantList list;
-  for (const auto& s : prolo_->AvailableSessions()) {
-    QVariantMap map;
-    map.insert("id", s.id);
-    map.insert("name", s.name);
-    map.insert("description", s.description);
-    list.append(map);
-  }
-  return QVariant::fromValue(list);
-}

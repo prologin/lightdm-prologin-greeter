@@ -1,0 +1,5 @@
+[LightDM]
+greeters-directory=@CMAKE_BINARY_DIR@
+
+[Seat:*]
+greeter-session=lightdm-prologin-greeter

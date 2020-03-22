@@ -28,6 +28,8 @@ int main(int argc, char** argv) {
   conf.beginGroup("greeter");
   options.url = conf.value("url").toString();
   options.prologind_socket = conf.value("prologind_socket").toString();
+  QColor bg_color(conf.value("background_color").toString());
+  if (bg_color.isValid()) options.background_color = bg_color;
   bool ok;
   int delay = conf.value("fallback_delay").toInt(&ok);
   if (ok) options.fallback_delay = delay;

@@ -7,6 +7,7 @@ find_package(Qt5 COMPONENTS Widgets Network WebEngineWidgets WebChannel REQUIRED
 
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(LIGHTDM REQUIRED liblightdm-qt5-3)
+pkg_check_modules(XCB REQUIRED xcb xcb-xkb)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_AUTOMOC ON)
@@ -17,6 +18,7 @@ add_executable(
         lightdm-prologin-greeter
         src/main.cc
         src/ProloGreet.cc
+        src/KeyboardModel.cc
         src/res.qrc)
 
 target_link_libraries(
@@ -25,10 +27,11 @@ target_link_libraries(
         Qt5::Network
         Qt5::WebEngineWidgets
         Qt5::WebChannel
-        ${LIGHTDM_LIBRARIES})
+        ${LIGHTDM_LIBRARIES}
+        ${XCB_LIBRARIES})
 
 target_include_directories(lightdm-prologin-greeter
-        PRIVATE ${CMAKE_BINARY_DIR} ${LIGHTDM_INCLUDE_DIRS})
+        PRIVATE ${CMAKE_BINARY_DIR} ${LIGHTDM_INCLUDE_DIRS} ${XCB_INCLUDE_DIRS})
 
 install(TARGETS lightdm-prologin-greeter
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
@@ -38,3 +41,13 @@ install(FILES conf/lightdm-prologin-greeter.desktop
 
 install(FILES conf/lightdm-prologin-greeter.conf
         DESTINATION ${CMAKE_INSTALL_SYSCONFDIR}/lightdm)
+
+
+configure_file(devel/lightdm.conf.in
+        ${CMAKE_BINARY_DIR}/lightdm.conf @ONLY)
+configure_file(devel/lightdm-prologin-greeter.desktop.in
+        ${CMAKE_BINARY_DIR}/lightdm-prologin-greeter.desktop @ONLY)
+
+# Test with:
+# ./devel/fake_prologind.py
+# lightdm --debug --test-mode -c ${CMAKE_BINARY_DIR}/lightdm.conf

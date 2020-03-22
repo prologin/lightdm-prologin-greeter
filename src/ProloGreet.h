@@ -3,10 +3,12 @@
 #include <QLabel>
 #include <QLightDM/Greeter>
 #include <QLocalSocket>
+#include <QStackedLayout>
 #include <QTextStream>
 #include <QWebChannelAbstractTransport>
-#include <QStackedLayout>
 #include <QWidget>
+
+#include "KeyboardModel.h"
 
 class QWebEngineView;
 class QWebChannel;
@@ -36,6 +38,7 @@ struct Options {
   QString url;
   int fallback_delay = 4000;
   QString prologind_socket = "/run/prologind";
+  QColor background_color = Qt::black;
 };
 
 struct XSession {
@@ -110,6 +113,10 @@ class ProloGreet : public QWidget {
   QLightDM::PowerInterface* lightdm_power_;
   QLightDM::SessionsModel* lightdm_sessions_;
 
+  // The KeyboardModel to watch for capslock & numlock & layout changes, and
+  // update layout.
+  KeyboardModel* keyboard_;
+
   friend class ProloJs;
 };
 
@@ -127,11 +134,28 @@ class ProloJs : public QObject {
   // Signal sent to JS when login failed somehow, eg. wrong credential or error
   // from prologind.
   void OnLoginError(const QString& reason);
+  // Signal sent to JS when CapsLock state changes.
+  void OnCapsLockChange(bool enabled);
+  // Signal sent to JS when NumLock state changes.
+  void OnNumLockChange(bool enabled);
+  // Signal sent to JS when active keyboard layout changes.
+  void OnKeyboardLayoutChange(int id);
+  // Signal sent to JS when available keyboard layouts change. Retrieve layouts
+  // with keyboardLayouts().
+  void OnKeyboardLayoutsChange();
 
  public slots:
   // Invoked through JS to retrieve available sessions (xsessions).
-  // Returns a list of {id: "id", name: "Name", "description": "..."}
+  // Returns a list of {id: "id", name: "Name", description: "..."}
   Q_INVOKABLE QVariant AvailableSessions();
+
+  // Invoked through JS to retrieve available keyboard layouts.
+  // Returns a list of {short: "short layout name", long: "long layout name"}
+  Q_INVOKABLE QVariant KeyboardLayouts();
+
+  // Invoked through JS to change the current layout.
+  // Will emit OnKeyboardLayoutChange() if successful.
+  Q_INVOKABLE void SetKeyboardLayout(int id);
 
   // Invoked through JS to start the authentication process.
   Q_INVOKABLE void Authenticate(const QString& username,
