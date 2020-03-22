@@ -41,6 +41,19 @@
         {id: "xfce", name: "XFCE", description: "This is XFCE"},
       ]);
     },
+    KeyboardLayouts: function () {
+      console.log("called KeyboardLayouts()");
+      return Promise.resolve([
+        {short: "us", long: "US"},
+        {short: "fr", long: "French (alternative)"},
+      ]);
+    },
+    SetKeyboardLayout: function () {
+      const that = this;
+      console.log(`called SetKeyboardLayout(${arguments})`);
+      setTimeout(() => that.OnKeyboardLayoutChange.notify(arguments[0]),
+        150);
+    },
     SetLanguage: function (l) {
       alert(`Setting language to ${l}`)
     },
@@ -53,6 +66,10 @@
     OnStatusMessage: fakeSignal(),
     OnLoginSuccess: fakeSignal(),
     OnLoginError: fakeSignal(),
+    OnKeyboardLayoutChange: fakeSignal(),
+    OnKeyboardLayoutsChange: fakeSignal(),
+    OnCapsLockChange: fakeSignal(),
+    OnNumLockChange: fakeSignal(),
   };
 
   window.QWebChannel = function (transport, callback) {

@@ -51,7 +51,7 @@ h1 > span {
   grid-row-gap: 1rem;
 }
 
-#sessions {
+.radios {
   display: grid;
   grid-gap: .5rem;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -73,7 +73,7 @@ h1 > span {
   padding-top: 2rem;
 }
 
-input, button, #sessions label > span {
+input, button, .radios label > span {
   font: inherit;
   border-radius: 3px;
   background-color: #00000033;
@@ -88,17 +88,17 @@ input, button, #sessions label > span {
   outline: none;
 }
 
-button:not(:disabled), #sessions input[type=radio]:not(:disabled) + span {
+button:not(:disabled), .radios input[type=radio]:not(:disabled) + span {
   cursor: pointer;
 }
 
-#sessions label span {
+.radios label span {
   display: block;
   white-space: nowrap;
   font-size: .8rem;
 }
 
-#sessions input[type=radio] {
+.radios input[type=radio] {
   /* Random hacks to hide radio without losing keyboard access. */
   float: left;
   width: 0;
@@ -117,17 +117,18 @@ input[type=password]::placeholder {
 
 input[type=password] {
   letter-spacing: 2pt;
+  padding-right: 8ch; /* padding for indicators */
 }
 
 button::-moz-focus-inner {
   border: none;
 }
 
-input:focus:not(:disabled), button:focus:not(:disabled), #sessions input[type=radio]:checked + span {
+input:focus:not(:disabled), button:focus:not(:disabled), .radios input[type=radio]:checked + span {
   border-color: mediumaquamarine;
 }
 
-input:disabled, button:disabled, #sessions input[type=radio]:disabled + span {
+input:disabled, button:disabled, .radios input[type=radio]:disabled + span {
   opacity: 0;
 }
 
@@ -135,6 +136,37 @@ input:disabled, button:disabled, #sessions input[type=radio]:disabled + span {
   opacity: 1;
   background: transparent;
   border-color: #efefef;
+}
+
+.indicator-wrap {
+  position: relative;
+}
+
+.indicators {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  display: flex;
+  justify-content: right;
+  align-items: center;
+}
+
+.indicator {
+  padding-right: 1em;
+  color: #aaa;
+  font-size: .8em;
+  line-height: 1.6;
+  cursor: help;
+  display: none;
+}
+
+.indicator.disabled.visible {
+  display: none;
+}
+
+.indicator.visible {
+  display: initial;
 }
 
 .error {
