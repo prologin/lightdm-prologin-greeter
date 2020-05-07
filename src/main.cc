@@ -27,7 +27,7 @@ int main(int argc, char** argv) {
   QSettings conf(conf_path, QSettings::IniFormat);
   conf.beginGroup("greeter");
   options.url = conf.value("url").toString();
-  options.prologind_socket = conf.value("prologind_socket").toString();
+  options.companion_socket = conf.value("companion_socket").toString();
   QColor bg_color(conf.value("background_color").toString());
   if (bg_color.isValid()) options.background_color = bg_color;
   bool ok;

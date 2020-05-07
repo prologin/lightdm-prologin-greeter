@@ -23,7 +23,7 @@ enum class AuthState {
   IDLE,
   WAITING_FOR_PROMPT,
   WAITING_FOR_AUTHENTICATION_COMPLETE,
-  WAITING_FOR_PROLOGIND
+  WAITING_FOR_COMPANION
 };
 
 struct State {
@@ -36,8 +36,8 @@ struct State {
 
 struct Options {
   QString url;
+  QString companion_socket;
   int fallback_delay = 4000;
-  QString prologind_socket = "/run/prologind";
   QColor background_color = Qt::black;
 };
 
@@ -55,8 +55,8 @@ class ProloGreet : public QWidget {
   bool Start() __attribute__((warn_unused_result));
 
  signals:
-  void PrologindSuccess();
-  void PrologindError(const QString& reason);
+  void CompanionSuccess();
+  void CompanionError(const QString& reason);
 
  private slots:
   // Internal webview events.
@@ -70,11 +70,11 @@ class ProloGreet : public QWidget {
                        QLightDM::Greeter::PromptType type);
   void OnLightDMAuthenticationComplete();
 
-  // prologind events.
-  void OnPrologindSuccess();
-  void OnPrologindError(const QString& reason);
-  void OnPrologindSocketError(QLocalSocket::LocalSocketError);
-  void OnPrologindSocketDisconnected();
+  // Companion events.
+  void OnCompanionSuccess();
+  void OnCompanionError(const QString& reason);
+  void OnCompanionSocketError(QLocalSocket::LocalSocketError);
+  void OnCompanionSocketDisconnected();
 
   // For ProloJs (friend class).
   void StartLightDmAuthentication(const QString& username,
@@ -88,16 +88,16 @@ class ProloGreet : public QWidget {
   QList<XSession> AvailableSessions() const;
 
   // Does blocking I/O. Run this in a thread.
-  void SetupWithPrologind();
-  void SendPrologindCleanup();
+  void SetupWithCompanion();
+  void SendCompanionCleanup();
 
   State state_;
   Options options_;
   bool webview_load_success_ = false;
   bool webview_uses_fallback_ = false;
 
-  // The communication channel with prologind.
-  QLocalSocket* prolo_sock_;
+  // The communication channel with the companion.
+  QLocalSocket* companion_sock_;
 
   // The UI elements.
   QStackedLayout* layout_;
@@ -126,13 +126,13 @@ class ProloJs : public QObject {
   explicit ProloJs(ProloGreet* prolo);
 
  signals:
-  // Signal sent to JS on messages from prologind.
+  // Signal sent to JS on messages from the companion.
   void OnStatusMessage(const QString& message);
   // Signal sent to JS when login was successful; LightDM will very soon start
   // the chosen session.
   void OnLoginSuccess();
   // Signal sent to JS when login failed somehow, eg. wrong credential or error
-  // from prologind.
+  // from the companion.
   void OnLoginError(const QString& reason);
   // Signal sent to JS when CapsLock state changes.
   void OnCapsLockChange(bool enabled);

@@ -1,5 +1,12 @@
 #!/usr/bin/env python
 
+"""
+A fake greeter companion.
+
+On setup, sends two progress message with 1s delay, then succeeds.
+On cleanup, succeeds after 1s.
+"""
+
 import time
 from socketserver import StreamRequestHandler, UnixStreamServer
 
@@ -37,7 +44,7 @@ class Handler(StreamRequestHandler):
 if __name__ == "__main__":
     import pathlib
 
-    addr = pathlib.Path("/tmp/prologind.socket")
+    addr = pathlib.Path("/tmp/greeter-companion.socket")
     try:
         addr.unlink()
     except FileNotFoundError:

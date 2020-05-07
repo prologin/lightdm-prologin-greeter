@@ -12,7 +12,7 @@
 #include <QtConcurrent/QtConcurrent>
 
 // Protocol:
-// greeter                       lightdm                      prologind
+// greeter                       lightdm                      companion
 //   authenticate(username) --->
 //                          <---  prompt()
 //   respond(password)      --->
@@ -45,7 +45,7 @@ ProloGreet::ProloGreet(Options options, QWidget* parent)
   connect(webview_, &QWebEngineView::loadFinished, this,
           &ProloGreet::OnWebviewLoadFinish);
 
-  status_info_ = new QLabel("ProLogin greeter is starting up…", this);
+  status_info_ = new QLabel("Prologin greeter is starting up…", this);
   status_info_->setAlignment(Qt::AlignCenter);
 
   layout_ = new QStackedLayout;
@@ -57,17 +57,17 @@ ProloGreet::ProloGreet(Options options, QWidget* parent)
   QRect screenRect = QGuiApplication::primaryScreen()->geometry();
   setGeometry(screenRect);
 
-  connect(this, &ProloGreet::PrologindSuccess, this,
-          &ProloGreet::OnPrologindSuccess);
-  connect(this, &ProloGreet::PrologindError, this,
-          &ProloGreet::OnPrologindError);
+  connect(this, &ProloGreet::CompanionSuccess, this,
+          &ProloGreet::OnCompanionSuccess);
+  connect(this, &ProloGreet::CompanionError, this,
+          &ProloGreet::OnCompanionError);
 
-  prolo_sock_ = new QLocalSocket(this);
-  connect(prolo_sock_, &QLocalSocket::disconnected, this,
-          &ProloGreet::OnPrologindSocketDisconnected);
-  connect(prolo_sock_,
+  companion_sock_ = new QLocalSocket(this);
+  connect(companion_sock_, &QLocalSocket::disconnected, this,
+          &ProloGreet::OnCompanionSocketDisconnected);
+  connect(companion_sock_,
           QOverload<QLocalSocket::LocalSocketError>::of(&QLocalSocket::error),
-          this, &ProloGreet::OnPrologindSocketError);
+          this, &ProloGreet::OnCompanionSocketError);
 
   prolojs_ = new ProloJs(this);
 
@@ -112,17 +112,18 @@ bool ProloGreet::Start() {
     return false;
   }
 
-  // Connect to prologind and ensure it's working.
-  prolo_sock_->connectToServer(options_.prologind_socket);
-  if (!prolo_sock_->waitForConnected(2 * 1000)) {
-    status_info_->setText("Could not connect to prologind socket");
+  // Connect to the companion and ensure it's working.
+  companion_sock_->connectToServer(options_.companion_socket);
+  if (!companion_sock_->waitForConnected(2 * 1000)) {
+    status_info_->setText(QString("Could not connect to companion socket: %s")
+                              .arg(options_.companion_socket));
     return false;
   }
-  prolo_sock_->write("ping\n");
-  prolo_sock_->flush();
-  if (!prolo_sock_->waitForReadyRead(5 * 1000) ||
-      prolo_sock_->readLine().trimmed().toStdString() != "pong") {
-    status_info_->setText("Did not receive 'pong' from prologind.");
+  companion_sock_->write("ping\n");
+  companion_sock_->flush();
+  if (!companion_sock_->waitForReadyRead(5 * 1000) ||
+      companion_sock_->readLine().trimmed().toStdString() != "pong") {
+    status_info_->setText("Did not receive 'pong' from companion.");
     return false;
   }
 
@@ -186,28 +187,28 @@ void ProloGreet::OnLightDMAuthenticationComplete() {
     return;
   }
 
-  state_.state = AuthState::WAITING_FOR_PROLOGIND;
+  state_.state = AuthState::WAITING_FOR_COMPANION;
   emit prolojs_->OnStatusMessage("authenticated! setting up…");
-  QtConcurrent::run(this, &ProloGreet::SetupWithPrologind);
+  QtConcurrent::run(this, &ProloGreet::SetupWithCompanion);
 }
 
-void ProloGreet::SetupWithPrologind() {
-  if (state_.state != AuthState::WAITING_FOR_PROLOGIND) {
+void ProloGreet::SetupWithCompanion() {
+  if (state_.state != AuthState::WAITING_FOR_COMPANION) {
     qWarning() << "illegal state in" << __FUNCTION__;
     return;
   }
-  prolo_sock_->write(QString("setup %1\n").arg(state_.username).toUtf8());
-  prolo_sock_->flush();
-  if (!prolo_sock_->waitForBytesWritten(3 * 1000)) {
-    qWarning() << "could not send 'setup' to prologind";
+  companion_sock_->write(QString("setup %1\n").arg(state_.username).toUtf8());
+  companion_sock_->flush();
+  if (!companion_sock_->waitForBytesWritten(3 * 1000)) {
+    qWarning() << "could not send 'setup' to companion";
     return;
   }
   while (true) {
-    if (!prolo_sock_->waitForReadyRead(30 * 1000)) {
-      qDebug() << "nothing from prologind after a long time";
+    if (!companion_sock_->waitForReadyRead(30 * 1000)) {
+      qDebug() << "nothing from the companion after a long time";
       return;
     }
-    const auto& ba = prolo_sock_->readLine();
+    const auto& ba = companion_sock_->readLine();
     if (ba.isEmpty()) return;
     const auto& daemon_response = QString::fromUtf8(ba).trimmed();
     qDebug() << "daemon response" << daemon_response;
@@ -217,25 +218,25 @@ void ProloGreet::SetupWithPrologind() {
       emit prolojs_->OnStatusMessage(payload);
     } else if (command == "error") {
       emit prolojs_->OnLoginError(payload);
-      emit PrologindError(payload);
+      emit CompanionError(payload);
       return;
     } else if (command == "success") {
       emit prolojs_->OnLoginSuccess();
-      emit PrologindSuccess();
+      emit CompanionSuccess();
       return;
     }
   }
 }
 
-void ProloGreet::OnPrologindSuccess() {
-  if (state_.state != AuthState::WAITING_FOR_PROLOGIND) {
+void ProloGreet::OnCompanionSuccess() {
+  if (state_.state != AuthState::WAITING_FOR_COMPANION) {
     qWarning() << "illegal state in" << __FUNCTION__;
     return;
   }
   qDebug() << __FUNCTION__;
   if (!lightdm_->startSessionSync(state_.session)) {
-    SendPrologindCleanup();
-    qWarning() << "LightDM startSession() returned false.";
+    SendCompanionCleanup();
+    qWarning() << "LightDM startSession() returned false";
   }
   state_.username.clear();
   state_.password.clear();
@@ -243,8 +244,8 @@ void ProloGreet::OnPrologindSuccess() {
   state_.state = AuthState::IDLE;
 }
 
-void ProloGreet::OnPrologindError(const QString& reason) {
-  if (state_.state != AuthState::WAITING_FOR_PROLOGIND) {
+void ProloGreet::OnCompanionError(const QString& reason) {
+  if (state_.state != AuthState::WAITING_FOR_COMPANION) {
     qWarning() << "illegal state in" << __FUNCTION__;
     return;
   }
@@ -271,14 +272,14 @@ void ProloGreet::MaybeFallbackToInternalGreeter() {
   webview_->load(QUrl("qrc:/fallback/login.html"));
 }
 
-void ProloGreet::SendPrologindCleanup() {
+void ProloGreet::SendCompanionCleanup() {
   QString username = state_.username;
   if (username.isEmpty()) {
-    qWarning() << "attempted to cleanup prologind on an empty username";
+    qWarning() << "attempted to send companion cleanup on an empty username";
     return;
   }
-  prolo_sock_->write(QString("cleanup %1\n").arg(username).toUtf8());
-  prolo_sock_->flush();
+  companion_sock_->write(QString("cleanup %1\n").arg(username).toUtf8());
+  companion_sock_->flush();
 }
 
 void ProloGreet::SetLanguage(const QString& language) {
@@ -305,9 +306,9 @@ QList<XSession> ProloGreet::AvailableSessions() const {
   return sessions;
 }
 
-void ProloGreet::OnPrologindSocketError(QLocalSocket::LocalSocketError) {}
+void ProloGreet::OnCompanionSocketError(QLocalSocket::LocalSocketError) {}
 
-void ProloGreet::OnPrologindSocketDisconnected() {}
+void ProloGreet::OnCompanionSocketDisconnected() {}
 
 ProloJs::ProloJs(ProloGreet* prolo) : QObject(), prolo_(prolo) {}
 

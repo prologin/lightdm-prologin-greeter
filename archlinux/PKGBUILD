@@ -2,9 +2,9 @@ pkgname=lightdm-prologin-greeter
 pkgver=1.0
 pkgrel=1
 epoch=1
-pkgdesc='ProLogin greeter for LightDM'
+pkgdesc='Prologin greeter for LightDM'
 arch=(x86_64)
-url=https://github.com/prologin/sadm
+url=https://github.com/prologin/lightdm-prologin-greeter
 license=(MIT)
 depends=(
   liblightdm-qt5

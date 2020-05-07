@@ -49,5 +49,5 @@ configure_file(devel/lightdm-prologin-greeter.desktop.in
         ${CMAKE_BINARY_DIR}/lightdm-prologin-greeter.desktop @ONLY)
 
 # Test with:
-# ./devel/fake_prologind.py
+# ./devel/companion.py
 # lightdm --debug --test-mode -c ${CMAKE_BINARY_DIR}/lightdm.conf
