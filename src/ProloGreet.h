@@ -73,7 +73,7 @@ class ProloGreet : public QWidget {
   // Companion events.
   void OnCompanionSuccess();
   void OnCompanionError(const QString& reason);
-  void OnCompanionSocketError(QLocalSocket::LocalSocketError);
+  void OnCompanionSocketError();
   void OnCompanionSocketDisconnected();
 
   // For ProloJs (friend class).

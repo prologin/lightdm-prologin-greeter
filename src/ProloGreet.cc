@@ -36,6 +36,24 @@ void SetWebviewOptions(QWebEngineView* view) {
   settings->setAttribute(S::LocalContentCanAccessRemoteUrls, false);
 }
 
+class AutoCancellableTimer {
+ public:
+  AutoCancellableTimer(QObject* parent, int msec, std::function<void()> cb)
+      : timer_(new QTimer(parent)) {
+    QObject::connect(timer_, &QTimer::timeout, std::move(cb));
+    timer_->setSingleShot(true);
+    timer_->start(msec);
+  }
+
+  ~AutoCancellableTimer() {
+    timer_->stop();
+    timer_->deleteLater();
+  }
+
+ private:
+  QTimer* timer_;
+};
+
 }  // namespace
 
 ProloGreet::ProloGreet(Options options, QWidget* parent)
@@ -199,21 +217,23 @@ void ProloGreet::SetupWithCompanion() {
   }
   companion_sock_->write(QString("setup %1\n").arg(state_.username).toUtf8());
   companion_sock_->flush();
-  if (!companion_sock_->waitForBytesWritten(3 * 1000)) {
-    qWarning() << "could not send 'setup' to companion";
-    return;
-  }
+  AutoCancellableTimer timeout(this, 30 * 1000, [this]() {
+    qWarning() << "SetupWithCompanion: timeout reading from companion";
+    QApplication::exit(1);
+  });
   while (true) {
-    if (!companion_sock_->waitForReadyRead(30 * 1000)) {
-      qDebug() << "nothing from the companion after a long time";
+    // waitForReadyRead() does not work as expected, somehow. Apparently Qt
+    // doesn't know how to I/O.
+    while (!companion_sock_->canReadLine()) QThread::msleep(250);
+    const auto& ba = companion_sock_->readLine();
+    if (ba.isEmpty()) {
+      qWarning() << __FUNCTION__ << "read empty line, returning";
       return;
     }
-    const auto& ba = companion_sock_->readLine();
-    if (ba.isEmpty()) return;
-    const auto& daemon_response = QString::fromUtf8(ba).trimmed();
-    qDebug() << "daemon response" << daemon_response;
-    const auto& command = daemon_response.section(' ', 0, 1);
-    const auto& payload = daemon_response.section(' ', 1);
+    const auto& response = QString::fromUtf8(ba).trimmed();
+    qDebug() << "companion response" << response;
+    const auto& command = response.section(' ', 0, 1);
+    const auto& payload = response.section(' ', 1);
     if (command == "message") {
       emit prolojs_->OnStatusMessage(payload);
     } else if (command == "error") {
@@ -306,9 +326,11 @@ QList<XSession> ProloGreet::AvailableSessions() const {
   return sessions;
 }
 
-void ProloGreet::OnCompanionSocketError(QLocalSocket::LocalSocketError) {}
+void ProloGreet::OnCompanionSocketError() {
+  qWarning() << __FUNCTION__ << companion_sock_->errorString();
+}
 
-void ProloGreet::OnCompanionSocketDisconnected() {}
+void ProloGreet::OnCompanionSocketDisconnected() { qWarning() << __FUNCTION__; }
 
 ProloJs::ProloJs(ProloGreet* prolo) : QObject(), prolo_(prolo) {}
 
