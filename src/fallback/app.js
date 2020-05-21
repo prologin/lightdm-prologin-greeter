@@ -60,7 +60,8 @@ function invalidShake($el) {
       }
     });
     // Select first by default.
-    $elem.querySelector('input[type=radio]').checked = true;
+    const firstRadio = $elem.querySelector('input[type=radio]');
+    if (firstRadio) firstRadio.checked = true;
   }
 
   function createSessionRadios(sessions) {
@@ -80,8 +81,8 @@ function invalidShake($el) {
       });
   }
 
-  function setStatus(message, error) {
-    $status.classList.toggle("error", error);
+  function setStatus(message, isError) {
+    $status.classList.toggle("error", isError);
     $status.textContent = message;
     clearInterval(statusTimeout);
     statusTimeout = setTimeout(() => {
@@ -90,8 +91,8 @@ function invalidShake($el) {
     }, 8000);
   }
 
-  function onStatusMessage(message) {
-    setStatus(message, false);
+  function onStatusMessage(message, isError) {
+    setStatus(message, isError);
   }
 
   function onLoginSuccess() {

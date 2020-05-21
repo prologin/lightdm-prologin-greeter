@@ -1,4 +1,4 @@
 [Desktop Entry]
 Name=Prologin Greeter (devel)
-Exec=lightdm-prologin-greeter @CMAKE_SOURCE_DIR@/devel/lightdm-prologin-greeter.conf
+Exec=@CMAKE_BINARY_DIR@/lightdm-prologin-greeter @CMAKE_SOURCE_DIR@/devel/lightdm-prologin-greeter.conf
 Type=Application

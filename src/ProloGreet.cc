@@ -24,13 +24,33 @@ void SetWebviewOptions(QWebEngineView* view) {
   settings->setAttribute(S::LocalContentCanAccessRemoteUrls, false);
 }
 
+QColor InverseColor(const QColor& color) {
+  qreal r, g, b;
+  color.getRgbF(&r, &g, &b, nullptr);
+  return QColor::fromRgbF(1 - r, 1 - g, 1 - b);
+}
 
 }  // namespace
 
 ProloGreet::ProloGreet(Options options, QWidget* parent)
     : state_(), options_(std::move(options)), QWidget(parent) {
+  {
+    auto pal = palette();
+    pal.setColor(QPalette::Window, options.background_color);
+    pal.setColor(QPalette::WindowText, InverseColor(options.background_color));
+    setAutoFillBackground(true);
+    setPalette(pal);
+  }
+
   webview_ = new QWebEngineView(this);
   SetWebviewOptions(webview_);
+  {
+    auto pal = webview_->palette();
+    pal.setColor(QPalette::Window, options.background_color);
+    webview_->setAutoFillBackground(true);
+    webview_->setPalette(pal);
+    webview_->page()->setBackgroundColor(options.background_color);
+  }
   connect(webview_, &QWebEngineView::loadFinished, this,
           &ProloGreet::OnWebviewLoadFinish);
 
@@ -92,7 +112,6 @@ bool ProloGreet::Start() {
   // Load the requested URL. Fallback to internal log-in screen after some time.
   webview_uses_fallback_ = false;
   webview_->load(options_.url);
-  layout_->setCurrentWidget(webview_);
   QTimer::singleShot(options_.fallback_delay,
                      [this]() { MaybeFallbackToInternalGreeter(); });
   return true;
@@ -114,7 +133,9 @@ void ProloGreet::StartLightDmAuthentication(const QString& username,
 
 void ProloGreet::OnLightDMMessage(const QString& message,
                                   QLightDM::Greeter::MessageType type) {
-  qDebug() << "received LightDM message" << type << message;
+  auto isError = type == QLightDM::Greeter::MessageTypeError;
+  qDebug() << "received LightDM message, error: " << isError << ":" << message;
+  js_->OnStatusMessage(message, isError);
 }
 
 void ProloGreet::OnLightDMPrompt(const QString& prompt,
@@ -124,7 +145,7 @@ void ProloGreet::OnLightDMPrompt(const QString& prompt,
     return;
   }
   if (type != QLightDM::Greeter::PromptType::PromptTypeSecret) {
-    qWarning() << "unexpected prompt";
+    qWarning() << "unexpected prompt; we only support SECRET, for the password";
     return;
   }
   state_.state = AuthState::WAITING_FOR_AUTHENTICATION_COMPLETE;
@@ -166,7 +187,12 @@ void ProloGreet::OnLightDMAuthenticationComplete() {
 
 void ProloGreet::OnWebviewLoadFinish(bool ok) {
   webview_load_success_ = ok;
-  if (!ok) MaybeFallbackToInternalGreeter();
+  if (!ok) {
+    MaybeFallbackToInternalGreeter();
+  } else {
+    // Finally reveal the webview. Prevents flashes of default background color.
+    layout_->setCurrentWidget(webview_);
+  }
 }
 
 void ProloGreet::MaybeFallbackToInternalGreeter() {
