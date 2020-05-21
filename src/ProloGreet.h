@@ -2,17 +2,14 @@
 
 #include <QLabel>
 #include <QLightDM/Greeter>
-#include <QLocalSocket>
 #include <QStackedLayout>
-#include <QTextStream>
-#include <QWebChannelAbstractTransport>
 #include <QWidget>
 
 #include "KeyboardModel.h"
 
 class QWebEngineView;
 class QWebChannel;
-class ProloJs;
+class GreetJS;
 
 namespace QLightDM {
 class PowerInterface;
@@ -23,7 +20,6 @@ enum class AuthState {
   IDLE,
   WAITING_FOR_PROMPT,
   WAITING_FOR_AUTHENTICATION_COMPLETE,
-  WAITING_FOR_COMPANION
 };
 
 struct State {
@@ -34,10 +30,11 @@ struct State {
   QString language;
 };
 
+constexpr char kFallbackUrl[] = "qrc:/fallback/login.html";
+
 struct Options {
-  QString url;
-  QString companion_socket;
-  int fallback_delay = 4000;
+  QString url = kFallbackUrl;
+  int fallback_delay = 2000;
   QColor background_color = Qt::black;
 };
 
@@ -54,10 +51,6 @@ class ProloGreet : public QWidget {
 
   bool Start() __attribute__((warn_unused_result));
 
- signals:
-  void CompanionSuccess();
-  void CompanionError(const QString& reason);
-
  private slots:
   // Internal webview events.
   void OnWebviewLoadFinish(bool ok);
@@ -70,12 +63,6 @@ class ProloGreet : public QWidget {
                        QLightDM::Greeter::PromptType type);
   void OnLightDMAuthenticationComplete();
 
-  // Companion events.
-  void OnCompanionSuccess();
-  void OnCompanionError(const QString& reason);
-  void OnCompanionSocketError();
-  void OnCompanionSocketDisconnected();
-
   // For ProloJs (friend class).
   void StartLightDmAuthentication(const QString& username,
                                   const QString& password,
@@ -87,17 +74,10 @@ class ProloGreet : public QWidget {
  private:
   QList<XSession> AvailableSessions() const;
 
-  // Does blocking I/O. Run this in a thread.
-  void SetupWithCompanion();
-  void SendCompanionCleanup();
-
   State state_;
   Options options_;
   bool webview_load_success_ = false;
   bool webview_uses_fallback_ = false;
-
-  // The communication channel with the companion.
-  QLocalSocket* companion_sock_;
 
   // The UI elements.
   QStackedLayout* layout_;
@@ -106,7 +86,7 @@ class ProloGreet : public QWidget {
 
   // The communication channel to JavaScript world.
   QWebChannel* channel_;
-  ProloJs* prolojs_;
+  GreetJS* js_;
 
   // The communication channel with LightDM, power and session APIs.
   QLightDM::Greeter* lightdm_;
@@ -117,22 +97,22 @@ class ProloGreet : public QWidget {
   // update layout.
   KeyboardModel* keyboard_;
 
-  friend class ProloJs;
+  friend class GreetJS;
 };
 
-class ProloJs : public QObject {
+class GreetJS : public QObject {
   Q_OBJECT
  public:
-  explicit ProloJs(ProloGreet* prolo);
+  explicit GreetJS(ProloGreet* prolo);
 
  signals:
-  // Signal sent to JS on messages from the companion.
-  void OnStatusMessage(const QString& message);
+  // Signal sent to JS on LightDM (typically from PAM) messages.
+  void OnStatusMessage(const QString& message, bool isError);
   // Signal sent to JS when login was successful; LightDM will very soon start
   // the chosen session.
   void OnLoginSuccess();
   // Signal sent to JS when login failed somehow, eg. wrong credential or error
-  // from the companion.
+  // from PAM.
   void OnLoginError(const QString& reason);
   // Signal sent to JS when CapsLock state changes.
   void OnCapsLockChange(bool enabled);
@@ -144,6 +124,8 @@ class ProloJs : public QObject {
   // with KeyboardLayouts().
   void OnKeyboardLayoutsChange();
 
+#pragma clang diagnostic push
+#pragma ide diagnostic ignored "UnusedGlobalDeclarationInspection"
  public slots:
   // Invoked through JS to retrieve available sessions (xsessions).
   // Returns a list of {id: "id", name: "Name", description: "..."}
@@ -170,6 +152,7 @@ class ProloJs : public QObject {
 
   // Invoked through JS to reboot.
   Q_INVOKABLE void Reboot();
+#pragma clang diagnostic pop
 
  private:
   ProloGreet* prolo_{};  // Not owned.

@@ -24,9 +24,9 @@
       const that = this;
       return new Promise(function (accept, reject) {
         console.log(`called WebAuthenticate(${arguments})`);
-        that.OnStatusMessage.notify("fake authenticating…");
-        setTimeout(() => that.OnStatusMessage.notify("please wait a bit…"), 1000);
-        setTimeout(() => that.OnStatusMessage.notify("real soon now…"), 2000);
+        that.OnStatusMessage.notify("fake authenticating…", false);
+        setTimeout(() => that.OnStatusMessage.notify("please wait a bit…", false), 1000);
+        setTimeout(() => that.OnStatusMessage.notify("real soon now…", false), 2000);
         // setTimeout(() => that.OnLoginSuccess.notify(), 3000);
         setTimeout(() => that.OnLoginError.notify("BAD PASSWORD"), 3000);
         setTimeout(() => reject(), 3100);

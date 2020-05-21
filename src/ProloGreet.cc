@@ -2,26 +2,14 @@
 
 #include <QApplication>
 #include <QGuiApplication>
-#include <QHBoxLayout>
 #include <QLightDM/Power>
 #include <QLightDM/SessionsModel>
 #include <QScreen>
+#include <QStackedLayout>
+#include <QTimer>
 #include <QWebChannel>
 #include <QWebEngineSettings>
 #include <QWebEngineView>
-#include <QtConcurrent/QtConcurrent>
-
-// Protocol:
-// greeter                       lightdm                      companion
-//   authenticate(username) --->
-//                          <---  prompt()
-//   respond(password)      --->
-//                          <---  authenticationComplete()
-// (password confirmed correct now)
-//   setup                  ------------------------------->
-//                          <-------------------------------   message ...
-//                          <-------------------------------   success
-//   startSession(kde)      --->
 
 namespace {
 
@@ -36,23 +24,6 @@ void SetWebviewOptions(QWebEngineView* view) {
   settings->setAttribute(S::LocalContentCanAccessRemoteUrls, false);
 }
 
-class AutoCancellableTimer {
- public:
-  AutoCancellableTimer(QObject* parent, int msec, std::function<void()> cb)
-      : timer_(new QTimer(parent)) {
-    QObject::connect(timer_, &QTimer::timeout, std::move(cb));
-    timer_->setSingleShot(true);
-    timer_->start(msec);
-  }
-
-  ~AutoCancellableTimer() {
-    timer_->stop();
-    timer_->deleteLater();
-  }
-
- private:
-  QTimer* timer_;
-};
 
 }  // namespace
 
@@ -75,28 +46,16 @@ ProloGreet::ProloGreet(Options options, QWidget* parent)
   QRect screenRect = QGuiApplication::primaryScreen()->geometry();
   setGeometry(screenRect);
 
-  connect(this, &ProloGreet::CompanionSuccess, this,
-          &ProloGreet::OnCompanionSuccess);
-  connect(this, &ProloGreet::CompanionError, this,
-          &ProloGreet::OnCompanionError);
-
-  companion_sock_ = new QLocalSocket(this);
-  connect(companion_sock_, &QLocalSocket::disconnected, this,
-          &ProloGreet::OnCompanionSocketDisconnected);
-  connect(companion_sock_,
-          QOverload<QLocalSocket::LocalSocketError>::of(&QLocalSocket::error),
-          this, &ProloGreet::OnCompanionSocketError);
-
-  prolojs_ = new ProloJs(this);
+  js_ = new GreetJS(this);
 
   // Establish a communication channel between us and the webview JS context.
   channel_ = new QWebChannel();
-  channel_->registerObject("prologin", prolojs_);
+  channel_->registerObject("prologin", js_);
   webview_->page()->setWebChannel(channel_);
 
   // LightDM APIs.
   lightdm_ = new QLightDM::Greeter(this);
-  // We want to die, not be reset.
+  // We want to die, not be reset. It's easier to not screw up state that way.
   lightdm_->setResettable(false);
   lightdm_power_ = new QLightDM::PowerInterface(this);
   lightdm_sessions_ = new QLightDM::SessionsModel(
@@ -112,13 +71,13 @@ ProloGreet::ProloGreet(Options options, QWidget* parent)
 
   keyboard_ = new KeyboardModel(this);
   connect(keyboard_, &KeyboardModel::currentLayoutChanged,
-          [this](int id) { prolojs_->OnKeyboardLayoutChange(id); });
+          [this](int id) { js_->OnKeyboardLayoutChange(id); });
   connect(keyboard_, &KeyboardModel::layoutsChanged,
-          [this]() { prolojs_->OnKeyboardLayoutsChange(); });
+          [this]() { js_->OnKeyboardLayoutsChange(); });
   connect(keyboard_, &KeyboardModel::capsLockStateChanged,
-          [this](bool enabled) { prolojs_->OnCapsLockChange(enabled); });
+          [this](bool enabled) { js_->OnCapsLockChange(enabled); });
   connect(keyboard_, &KeyboardModel::numLockStateChanged,
-          [this](bool enabled) { prolojs_->OnNumLockChange(enabled); });
+          [this](bool enabled) { js_->OnNumLockChange(enabled); });
   keyboard_->initialize();
 }
 
@@ -127,21 +86,6 @@ bool ProloGreet::Start() {
   status_info_->setText("Connecting to LightDM…");
   if (!lightdm_->connectSync()) {
     status_info_->setText("Could not connect to LightDM.");
-    return false;
-  }
-
-  // Connect to the companion and ensure it's working.
-  companion_sock_->connectToServer(options_.companion_socket);
-  if (!companion_sock_->waitForConnected(2 * 1000)) {
-    status_info_->setText(QString("Could not connect to companion socket: %s")
-                              .arg(options_.companion_socket));
-    return false;
-  }
-  companion_sock_->write("ping\n");
-  companion_sock_->flush();
-  if (!companion_sock_->waitForReadyRead(5 * 1000) ||
-      companion_sock_->readLine().trimmed().toStdString() != "pong") {
-    status_info_->setText("Did not receive 'pong' from companion.");
     return false;
   }
 
@@ -201,79 +145,23 @@ void ProloGreet::OnLightDMAuthenticationComplete() {
   if (!lightdm_->isAuthenticated()) {
     lightdm_->cancelAuthentication();
     state_.state = AuthState::IDLE;
-    emit prolojs_->OnLoginError("incorrect password");
+    emit js_->OnLoginError("incorrect password");
     return;
   }
 
-  state_.state = AuthState::WAITING_FOR_COMPANION;
-  emit prolojs_->OnStatusMessage("authenticated! setting up…");
-  QtConcurrent::run(this, &ProloGreet::SetupWithCompanion);
-}
+  qDebug() << "Authentication complete";
+  emit js_->OnLoginSuccess();
+  state_.username.clear();
+  state_.password.clear();
+  state_.session.clear();
+  state_.state = AuthState::IDLE;
 
-void ProloGreet::SetupWithCompanion() {
-  if (state_.state != AuthState::WAITING_FOR_COMPANION) {
-    qWarning() << "illegal state in" << __FUNCTION__;
-    return;
-  }
-  companion_sock_->write(QString("setup %1\n").arg(state_.username).toUtf8());
-  companion_sock_->flush();
-  AutoCancellableTimer timeout(this, 30 * 1000, [this]() {
-    qWarning() << "SetupWithCompanion: timeout reading from companion";
-    QApplication::exit(1);
-  });
-  while (true) {
-    // waitForReadyRead() does not work as expected, somehow. Apparently Qt
-    // doesn't know how to I/O.
-    while (!companion_sock_->canReadLine()) QThread::msleep(250);
-    const auto& ba = companion_sock_->readLine();
-    if (ba.isEmpty()) {
-      qWarning() << __FUNCTION__ << "read empty line, returning";
-      return;
-    }
-    const auto& response = QString::fromUtf8(ba).trimmed();
-    qDebug() << "companion response" << response;
-    const auto& command = response.section(' ', 0, 1);
-    const auto& payload = response.section(' ', 1);
-    if (command == "message") {
-      emit prolojs_->OnStatusMessage(payload);
-    } else if (command == "error") {
-      emit prolojs_->OnLoginError(payload);
-      emit CompanionError(payload);
-      return;
-    } else if (command == "success") {
-      emit prolojs_->OnLoginSuccess();
-      emit CompanionSuccess();
-      return;
-    }
-  }
-}
-
-void ProloGreet::OnCompanionSuccess() {
-  if (state_.state != AuthState::WAITING_FOR_COMPANION) {
-    qWarning() << "illegal state in" << __FUNCTION__;
-    return;
-  }
-  qDebug() << __FUNCTION__;
   if (!lightdm_->startSessionSync(state_.session)) {
-    SendCompanionCleanup();
+    lightdm_->cancelAuthentication();
     qWarning() << "LightDM startSession() returned false";
   }
-  state_.username.clear();
-  state_.password.clear();
-  state_.session.clear();
-  state_.state = AuthState::IDLE;
-}
-
-void ProloGreet::OnCompanionError(const QString& reason) {
-  if (state_.state != AuthState::WAITING_FOR_COMPANION) {
-    qWarning() << "illegal state in" << __FUNCTION__;
-    return;
-  }
-  lightdm_->cancelAuthentication();
-  state_.username.clear();
-  state_.password.clear();
-  state_.session.clear();
-  state_.state = AuthState::IDLE;
+  qDebug() << "Authentication complete, starting session (I will die soon)";
+  close();
 }
 
 void ProloGreet::OnWebviewLoadFinish(bool ok) {
@@ -289,17 +177,7 @@ void ProloGreet::MaybeFallbackToInternalGreeter() {
   }
   qWarning()
       << "could not load requested url; falling back to internal greeter";
-  webview_->load(QUrl("qrc:/fallback/login.html"));
-}
-
-void ProloGreet::SendCompanionCleanup() {
-  QString username = state_.username;
-  if (username.isEmpty()) {
-    qWarning() << "attempted to send companion cleanup on an empty username";
-    return;
-  }
-  companion_sock_->write(QString("cleanup %1\n").arg(username).toUtf8());
-  companion_sock_->flush();
+  webview_->load(QUrl(kFallbackUrl));
 }
 
 void ProloGreet::SetLanguage(const QString& language) {
@@ -326,15 +204,9 @@ QList<XSession> ProloGreet::AvailableSessions() const {
   return sessions;
 }
 
-void ProloGreet::OnCompanionSocketError() {
-  qWarning() << __FUNCTION__ << companion_sock_->errorString();
-}
+GreetJS::GreetJS(ProloGreet* prolo) : QObject(), prolo_(prolo) {}
 
-void ProloGreet::OnCompanionSocketDisconnected() { qWarning() << __FUNCTION__; }
-
-ProloJs::ProloJs(ProloGreet* prolo) : QObject(), prolo_(prolo) {}
-
-QVariant ProloJs::AvailableSessions() {
+QVariant GreetJS::AvailableSessions() {
   QVariantList list;
   for (const auto& s : prolo_->AvailableSessions()) {
     QVariantMap map;
@@ -346,7 +218,7 @@ QVariant ProloJs::AvailableSessions() {
   return QVariant::fromValue(list);
 }
 
-QVariant ProloJs::KeyboardLayouts() {
+QVariant GreetJS::KeyboardLayouts() {
   QVariantList list;
   for (const auto* layout : prolo_->keyboard_->layouts()) {
     QVariantMap map;
@@ -357,17 +229,17 @@ QVariant ProloJs::KeyboardLayouts() {
   return QVariant::fromValue(list);
 }
 
-void ProloJs::SetKeyboardLayout(int id) { prolo_->keyboard_->setLayout(id); }
+void GreetJS::SetKeyboardLayout(int id) { prolo_->keyboard_->setLayout(id); }
 
-void ProloJs::Authenticate(const QString& username, const QString& password,
+void GreetJS::Authenticate(const QString& username, const QString& password,
                            const QString& session) {
   prolo_->StartLightDmAuthentication(username, password, session);
 }
 
-void ProloJs::SetLanguage(const QString& language) {
+void GreetJS::SetLanguage(const QString& language) {
   prolo_->SetLanguage(language);
 }
 
-void ProloJs::PowerOff() { prolo_->PowerOff(); }
+void GreetJS::PowerOff() { prolo_->PowerOff(); }
 
-void ProloJs::Reboot() { prolo_->Reboot(); }
+void GreetJS::Reboot() { prolo_->Reboot(); }

@@ -23,15 +23,16 @@ int main(int argc, char** argv) {
   if (QApplication::arguments().length() >= 2) {
     conf_path = QApplication::arguments().at(1);
   }
+
   Options options;
   QSettings conf(conf_path, QSettings::IniFormat);
   conf.beginGroup("greeter");
-  options.url = conf.value("url").toString();
-  options.companion_socket = conf.value("companion_socket").toString();
-  QColor bg_color(conf.value("background_color").toString());
+  const QString url = conf.value("url").toString();
+  if (!url.isEmpty()) options.url = url;
+  const QColor bg_color(conf.value("background_color").toString());
   if (bg_color.isValid()) options.background_color = bg_color;
   bool ok;
-  int delay = conf.value("fallback_delay").toInt(&ok);
+  const int delay = conf.value("fallback_delay").toInt(&ok);
   if (ok) options.fallback_delay = delay;
   const auto& proxy_spec = conf.value("http_proxy").toString();
   conf.endGroup();
