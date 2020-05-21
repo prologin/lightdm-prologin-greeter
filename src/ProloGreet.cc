@@ -2,6 +2,9 @@
 
 #include <QApplication>
 #include <QGuiApplication>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QJsonParseError>
 #include <QLightDM/Power>
 #include <QLightDM/SessionsModel>
 #include <QScreen>
@@ -127,15 +130,30 @@ void ProloGreet::StartLightDmAuthentication(const QString& username,
   state_.username = username;
   state_.password = password;
   state_.session = session;
+  state_.got_business_logic_error = false;
   state_.state = AuthState::WAITING_FOR_PROMPT;
   lightdm_->authenticate(username);
 }
 
-void ProloGreet::OnLightDMMessage(const QString& message,
+void ProloGreet::OnLightDMMessage(const QString& payload,
                                   QLightDM::Greeter::MessageType type) {
-  auto isError = type == QLightDM::Greeter::MessageTypeError;
-  qDebug() << "received LightDM message, error: " << isError << ":" << message;
-  js_->OnStatusMessage(message, isError);
+  // We only support JSON-encoded messages (not generic PAM errors that are too
+  // noisy & inscrutable).
+  qDebug() << "received LightDM message, error:" << type << ":" << payload;
+  if (type != QLightDM::Greeter::MessageTypeInfo) return;
+  QJsonParseError error;
+  const auto json = QJsonDocument::fromJson(payload.toUtf8(), &error);
+  if (error.error != QJsonParseError::NoError) return;
+  if (!json.isObject()) return;
+  const auto message = json.object().value("message").toString();
+  if (message.isNull()) return;
+  const auto isError = json.object().value("isError").toBool();
+  if (isError) {
+    state_.got_business_logic_error = true;
+    js_->OnLoginError(message);
+  } else {
+    js_->OnStatusMessage(message);
+  }
 }
 
 void ProloGreet::OnLightDMPrompt(const QString& prompt,
@@ -166,22 +184,41 @@ void ProloGreet::OnLightDMAuthenticationComplete() {
   if (!lightdm_->isAuthenticated()) {
     lightdm_->cancelAuthentication();
     state_.state = AuthState::IDLE;
-    emit js_->OnLoginError("incorrect password");
+    if (!state_.got_business_logic_error) {
+      // LightDM doesn't give us a way to distinguish between PAM failures. A
+      // bad password would typically be a PAM 'auth' stage failure, but if some
+      // 'account' stage returns non-zero, it appears the same to us:
+      // isAuthenticated() = false. We don't want to say "incorrect password"
+      // for "business logic" errors (the JSON-encoded ones in
+      // OnLightDMMessage). So when we receive such a JSON "business logic"
+      // error, we set got_business_logic_error to true. If it's false when we
+      // check it here, this must be an early stage PAM error, so we guess
+      // that's a bad password. Otherwise, we don't send anything so the last
+      // "business logic" error remains the one displayed to the user.
+      emit js_->OnLoginError("incorrect password");
+    }
     return;
   }
 
-  qDebug() << "Authentication complete";
+  qDebug() << "Authentication complete, starting session" << state_.session;
   emit js_->OnLoginSuccess();
+
+  if (!lightdm_->startSessionSync(state_.session)) {
+    lightdm_->cancelAuthentication();
+    qWarning() << "LightDM startSession() returned false; I don't know how to "
+                  "handle that and will die now.";
+  } else {
+    // This code and below will likely not have time to execute, since LightDM
+    // kills us right after startSessionSync().
+    qDebug() << "Authentication complete, LightDM is taking over. Bye!";
+  }
+
+  // Reset everything just in case.
   state_.username.clear();
   state_.password.clear();
   state_.session.clear();
   state_.state = AuthState::IDLE;
-
-  if (!lightdm_->startSessionSync(state_.session)) {
-    lightdm_->cancelAuthentication();
-    qWarning() << "LightDM startSession() returned false";
-  }
-  qDebug() << "Authentication complete, starting session (I will die soon)";
+  // Self-quit.
   close();
 }
 

@@ -28,6 +28,7 @@ struct State {
   QString password;
   QString session;
   QString language;
+  bool got_business_logic_error = false;
 };
 
 constexpr char kFallbackUrl[] = "qrc:/fallback/login.html";
@@ -107,7 +108,7 @@ class GreetJS : public QObject {
 
  signals:
   // Signal sent to JS on LightDM (typically from PAM) messages.
-  void OnStatusMessage(const QString& message, bool isError);
+  void OnStatusMessage(const QString& message);
   // Signal sent to JS when login was successful; LightDM will very soon start
   // the chosen session.
   void OnLoginSuccess();
