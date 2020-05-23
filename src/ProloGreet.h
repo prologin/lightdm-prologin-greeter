@@ -108,7 +108,7 @@ class GreetJS : public QObject {
 
  signals:
   // Signal sent to JS on LightDM (typically from PAM) messages.
-  void OnStatusMessage(const QString& message);
+  void OnStatusMessage(const QString& message, bool isError);
   // Signal sent to JS when login was successful; LightDM will very soon start
   // the chosen session.
   void OnLoginSuccess();

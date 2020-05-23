@@ -91,8 +91,8 @@ function invalidShake($el) {
     }, 8000);
   }
 
-  function onStatusMessage(message) {
-    setStatus(message, false);
+  function onStatusMessage(message, isError) {
+    setStatus(message, isError);
   }
 
   function onLoginSuccess() {
@@ -100,7 +100,8 @@ function invalidShake($el) {
   }
 
   function onLoginError(reason) {
-    setStatus(`Error: ${reason}`, true);
+    if (reason && reason.length)
+      setStatus(`Error: ${reason}`, true);
 
     // Reset form.
     $interactiveElements.forEach(e => e.disabled = false);
