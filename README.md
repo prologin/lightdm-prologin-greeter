@@ -33,3 +33,12 @@ background_color = "#123abc"
 ; Seconds to wait for the page to load before falling-back.
 fallback_delay = 3
 ```
+
+## Fallback theme
+
+The built-in fallback theme is bare-bones but contains all that necessary bits
+to interact with the login manager, which isn't a trivial amount of code. To
+make it easy to customize the theme without having to create JS and CSS from 
+scratch, the fallback theme references `http://greeter/theme.css` and
+`http://greeter/theme.js` after the default resources. By making these files 
+available on the network, you can easily override the default look and behavior.
