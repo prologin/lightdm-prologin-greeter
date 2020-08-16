@@ -4,5 +4,6 @@
         <file>fallback/login.html</file>
         <file>fallback/app.js</file>
         <file>fallback/style.css</file>
+        <file>fallback/prologin.svg</file>
     </qresource>
 </RCC>

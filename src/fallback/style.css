@@ -29,17 +29,33 @@ body {
   justify-content: center;
 }
 
+
+#head {
+  grid-area: head;
+}
+
+h1:before {
+  content: '';
+  background-image: url(prologin.svg);
+  background-size: contain;
+  background-repeat: no-repeat;
+  opacity: .8;
+  width: 3.5em;
+  height: 3.5em;
+  position: absolute;
+  top: calc(-3.5em / 3);
+  left: calc(-3.5em - 1em);
+}
+
 h1 {
   margin: 4rem 0 0;
   padding: 0;
+  display: inline-block;
+  position: relative;
 }
 
 h1 > span {
   color: mediumaquamarine;
-}
-
-#head {
-  grid-area: head;
 }
 
 #form {
